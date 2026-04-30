@@ -1,12 +1,12 @@
 """
 Calibration procedures for the four stochastic models in StochastiQ.
 
-Each function fits a model's parameters to a time series of historical
-log returns. The fitting procedures are deliberately well-known and
-defensible -- this module is the technical heart of the project, and
-clarity is more valuable than cleverness.
+This module fits each model's parameters to a time series of historical
+log returns. All procedures are documented and defensible -- the math is
+the technical heart of the project, and clarity is more valuable than
+cleverness.
 
-Procedures implemented:
+Procedures implemented (per model):
 
     GBM     -- Maximum likelihood: sample mean and standard deviation
                of log returns, annualized.
@@ -15,28 +15,57 @@ Procedures implemented:
                jumps; jump distribution fitted as log-normal; diffusion
                re-estimated on cleaned-of-jumps returns.
 
-    CEV     -- Two-step OLS: estimate elasticity gamma via regression of
-               log|delta S| on log S, then estimate the volatility scale
-               sigma given gamma.
+    CEV     -- Two methods provided:
+                 (a) `calibrate_cev`     -- Two-step OLS on log|delta S|
+                                            vs log S (fast, can be fragile
+                                            for low-vol smooth series).
+                 (b) `calibrate_cev_nls` -- Nonlinear least squares fitting
+                                            CEV-implied local vol to rolling
+                                            realized vol. Robust across all
+                                            asset types (recommended).
 
-    Heston  -- Method of moments on rolling realized variance:
-                  theta   = sample mean of realized variance
-                  kappa   = -log(rho_AR1) of AR(1) on realized variance
-                  sigma_v = volatility of innovations to realized variance
-                  rho     = correlation between price returns and changes
-                            in realized variance
-                  v0      = most recent realized variance estimate
+    Heston  -- Two variants provided:
+                 (a) `calibrate_heston`              -- Unconstrained method
+                                                        of moments on rolling
+                                                        21-day realized
+                                                        variance.
+                 (b) `calibrate_heston_constrained`  -- Same MoM but enforces
+                                                        Feller condition by
+                                                        capping sigma_v.
+
+Both Heston variants are presented in the notebook with a comparison.
 """
 
 from __future__ import annotations
 
+import warnings
+
 import numpy as np
 import pandas as pd
+from scipy.optimize import minimize_scalar
+from scipy.stats import ks_2samp
 
 from src.models.gbm import GBMParams
 from src.models.merton import MertonParams
 from src.models.cev import CEVParams
 from src.models.heston import HestonParams
+
+
+# ============================================================
+# Module-level constants for calibration robustness
+# ============================================================
+
+# Bounds for the CEV elasticity parameter. Values outside [0.1, 1.5] are
+# economically implausible for equities; when the OLS estimate falls outside
+# this range we fall back to gamma = 1.0 (CEV degenerates to GBM).
+CEV_GAMMA_MIN: float = 0.1
+CEV_GAMMA_MAX: float = 1.5
+
+# Margin used by the Feller-constrained Heston calibrator.
+# We enforce 2*kappa*theta >= (1 + FELLER_MARGIN) * sigma_v^2, so the
+# Feller condition holds with a small safety buffer rather than at the
+# boundary. 0.05 = 5% buffer.
+FELLER_MARGIN: float = 0.05
 
 
 # ============================================================
@@ -78,25 +107,13 @@ def calibrate_merton(
 
     Procedure:
       1. Standardize returns and flag those with |z| > threshold as jumps.
-      2. Fit log-normal jump distribution to the flagged returns
-         (mean and std of those returns).
-      3. Re-estimate diffusion mu and sigma from the *non-jump* returns.
+      2. Fit log-normal jump distribution to the flagged returns.
+      3. Re-estimate diffusion mu and sigma from the non-jump returns.
       4. lambda = (number of jumps) / (years of data).
 
-    The threshold method is simple and transparent, well-suited to a class
-    project. More sophisticated alternatives (Bayesian filtering, EM
-    algorithm, characteristic-function MLE) exist but are not required.
-
-    Parameters
-    ----------
-    log_returns : pd.Series
-        Daily log returns.
-    trading_days : int
-        Trading-day convention.
-    jump_threshold_sigma : float
-        Returns beyond this many standard deviations are flagged as jumps.
-        3.0 captures the obvious tail events while keeping a clean
-        diffusion sample.
+    The threshold method is simple and transparent. More sophisticated
+    alternatives (Bayesian filtering, EM algorithm, characteristic-function
+    MLE) exist but are out of scope for this project.
     """
     returns = log_returns.dropna().values
 
@@ -113,7 +130,6 @@ def calibrate_merton(
         mu_j = float(jump_returns.mean())
         sigma_j = float(jump_returns.std(ddof=1))
     else:
-        # Not enough jumps to fit; fall back to small jumps
         mu_j = 0.0
         sigma_j = 2.0 * daily_std
 
@@ -129,7 +145,6 @@ def calibrate_merton(
     lambda_j = float(n_jumps / years_of_data)
 
     # Total drift mu including jump compensation
-    # Daily drift before jump effect: (mu - lambda*k - 0.5*sigma^2)*dt = diff_daily_mean
     k = float(np.exp(mu_j + 0.5 * sigma_j ** 2) - 1.0)
     mu = float(diff_daily_mean * trading_days + 0.5 * sigma ** 2 + lambda_j * k)
 
@@ -143,17 +158,8 @@ def calibrate_merton(
 
 
 # ============================================================
-# CEV
+# CEV -- Method A: OLS on log|delta S| vs log S
 # ============================================================
-
-# Bounds for the CEV elasticity parameter.
-# Values outside [0.1, 1.5] are economically implausible for equities and
-# typically indicate a poor regression fit (low signal-to-noise in the data).
-# When the unconstrained OLS estimate falls outside this range, we fall back
-# to gamma = 1.0 (CEV degenerates to GBM with sigma = empirical sigma).
-CEV_GAMMA_MIN: float = 0.1
-CEV_GAMMA_MAX: float = 1.5
-
 
 def calibrate_cev(
     prices: pd.Series,
@@ -161,73 +167,47 @@ def calibrate_cev(
     trading_days: int = 252,
 ) -> CEVParams:
     """
-    OLS-based calibration of the CEV model with robustness fallbacks.
+    OLS-based calibration of CEV (Method A: legacy, kept for comparison).
 
-    Starting from the SDE dS = mu*S*dt + sigma*S^gamma*dW, the absolute
-    increment satisfies:
+    Starting from the SDE dS = mu*S*dt + sigma*S^gamma*dW:
         |dS| ~ sigma * S^gamma * sqrt(dt)
-    Taking logs:
         log|dS| ~ log(sigma) + gamma * log(S) + 0.5 * log(dt)
 
     OLS regression of log|delta S| on log S yields gamma directly, and
-    the intercept gives sigma (after subtracting the dt term).
+    the intercept gives sigma. This method is fast but can be fragile for
+    smooth low-volatility series (the log|dS| signal is weak relative to
+    noise). When the estimate falls outside reasonable bounds, we fall
+    back to gamma = 1.0 with sigma = GBM sigma.
 
-    Robustness: For low-volatility series (e.g., broad-market ETFs) the
-    log|dS| signal is weak relative to noise, and the OLS estimate of gamma
-    can land outside any economically reasonable range. We bound the
-    estimate to [CEV_GAMMA_MIN, CEV_GAMMA_MAX]; if it falls outside, we
-    fall back to gamma = 1.0 with sigma equal to the GBM sigma. This keeps
-    CEV simulation numerically stable across all assets.
-
-    Parameters
-    ----------
-    prices : pd.Series
-        Price series (NOT returns).
-    log_returns : pd.Series
-        Daily log returns (used for drift estimate).
-    trading_days : int
-        Trading-day convention.
+    The newer `calibrate_cev_nls` is more robust and is recommended as the
+    default in the notebook.
     """
     prices = prices.dropna()
     delta_s = prices.diff().dropna()
 
-    # Align price levels at t-1 with delta_s (forward differences)
-    s_lag = prices.shift(1).dropna()
-    s_lag = s_lag.loc[delta_s.index]
+    s_lag = prices.shift(1).dropna().loc[delta_s.index]
 
-    # Filter out zero-increment days to avoid log(0)
     nonzero = delta_s.abs() > 1e-12
     log_abs_ds = np.log(delta_s[nonzero].abs().values)
     log_s = np.log(s_lag[nonzero].values)
 
-    # OLS: log|dS| = a + gamma * log(S)
     A = np.vstack([np.ones_like(log_s), log_s]).T
     coeffs, *_ = np.linalg.lstsq(A, log_abs_ds, rcond=None)
     intercept, gamma_raw = float(coeffs[0]), float(coeffs[1])
 
     dt = 1.0 / trading_days
-
-    # GBM sigma from log returns, used as fallback and as a sanity reference
     gbm_sigma = float(log_returns.std(ddof=1) * np.sqrt(trading_days))
-
-    # Annualized drift estimate (same as GBM)
     mu = float(log_returns.mean() * trading_days + 0.5 * gbm_sigma ** 2)
 
-    # Robustness check on gamma
     if CEV_GAMMA_MIN <= gamma_raw <= CEV_GAMMA_MAX:
         gamma = gamma_raw
-        # Recover sigma from intercept
         sigma_raw = float(np.exp(intercept - 0.5 * np.log(dt)))
-        # Sanity check sigma: if it's more than 10x the GBM sigma, the
-        # regression is producing inconsistent estimates -- fall back to GBM.
-        # The 10x threshold is generous but catches obvious failures.
         if sigma_raw > 10.0 * gbm_sigma or sigma_raw < 0.1 * gbm_sigma:
             gamma = 1.0
             sigma = gbm_sigma
         else:
             sigma = sigma_raw
     else:
-        # gamma estimate is outside economic plausible range -- fall back to GBM
         gamma = 1.0
         sigma = gbm_sigma
 
@@ -235,7 +215,100 @@ def calibrate_cev(
 
 
 # ============================================================
-# Heston
+# CEV -- Method B: Nonlinear least squares on rolling realized vol
+# ============================================================
+
+def calibrate_cev_nls(
+    prices: pd.Series,
+    log_returns: pd.Series,
+    trading_days: int = 252,
+    rv_window: int = 21,
+) -> CEVParams:
+    """
+    Nonlinear least squares calibration of CEV (Method B: recommended).
+
+    Idea: under CEV, the local volatility at price S is sigma_local(S) =
+    sigma * S^(gamma - 1). We compute rolling realized volatility from the
+    return series and fit the parameters (sigma, gamma) by minimizing the
+    squared error between observed rolling realized vol and the model-implied
+    local vol at each time:
+
+        minimize sum_t [ rv_t - sigma * S_t^(gamma - 1) ]^2
+
+    For a given gamma, the optimal sigma is available in closed form:
+        sigma(gamma) = sum(rv_t * S_t^(gamma - 1)) / sum(S_t^(2*(gamma - 1)))
+
+    So we reduce the 2D optimization to a 1D search over gamma in
+    [CEV_GAMMA_MIN, CEV_GAMMA_MAX], using bounded scalar minimization.
+
+    This method is more robust than the log|dS| OLS regression because:
+      - It uses a smoothed volatility signal (rolling RV) rather than
+        single-day |delta S|, which is much noisier.
+      - It directly fits the quantity the model is trying to capture
+        (the local-vol -- price-level relationship) rather than its log.
+      - It naturally enforces gamma bounds via bounded optimization.
+
+    Parameters
+    ----------
+    prices : pd.Series
+        Price series.
+    log_returns : pd.Series
+        Daily log returns (used for drift estimate).
+    trading_days : int
+        Trading-day convention.
+    rv_window : int
+        Rolling window for realized vol estimation. 21 days is one month.
+    """
+    prices = prices.dropna()
+
+    # Rolling realized vol (annualized, in volatility units, not variance)
+    rv = log_returns.rolling(window=rv_window).std() * np.sqrt(trading_days)
+    rv = rv.dropna()
+
+    # Align prices with rv
+    s = prices.loc[rv.index].values
+    rv_vals = rv.values
+
+    # Drop any non-positive prices defensively (should not happen for real data)
+    valid = (s > 0) & np.isfinite(rv_vals)
+    s = s[valid]
+    rv_vals = rv_vals[valid]
+
+    def loss(gamma: float) -> float:
+        """Squared error between observed RV and CEV-implied local vol."""
+        # Closed-form sigma given gamma
+        s_pow = np.power(s, gamma - 1.0)
+        denom = np.sum(s_pow ** 2)
+        if denom < 1e-12:
+            return np.inf
+        sigma = np.sum(rv_vals * s_pow) / denom
+        if sigma <= 0:
+            return np.inf
+        residuals = rv_vals - sigma * s_pow
+        return float(np.sum(residuals ** 2))
+
+    # 1D bounded search over gamma
+    result = minimize_scalar(
+        loss,
+        bounds=(CEV_GAMMA_MIN, CEV_GAMMA_MAX),
+        method="bounded",
+        options={"xatol": 1e-4},
+    )
+
+    gamma = float(result.x)
+    # Recover sigma at the optimum
+    s_pow = np.power(s, gamma - 1.0)
+    sigma = float(np.sum(rv_vals * s_pow) / np.sum(s_pow ** 2))
+
+    # Drift from log returns
+    gbm_sigma = float(log_returns.std(ddof=1) * np.sqrt(trading_days))
+    mu = float(log_returns.mean() * trading_days + 0.5 * gbm_sigma ** 2)
+
+    return CEVParams(mu=mu, sigma=sigma, gamma=gamma)
+
+
+# ============================================================
+# Heston -- Method A: unconstrained method of moments
 # ============================================================
 
 def calibrate_heston(
@@ -244,40 +317,29 @@ def calibrate_heston(
     rv_window: int = 21,
 ) -> HestonParams:
     """
-    Method-of-moments calibration of Heston using rolling realized variance.
+    Unconstrained method-of-moments calibration of Heston.
 
     Procedure:
-      1. Compute rolling-window realized variance:
-            RV_t = (sum of squared returns over rv_window days) * (trading_days / rv_window)
-         This is an annualized variance proxy for v_t.
+      1. Compute rolling-window annualized realized variance (proxy for v_t).
       2. theta = sample mean of RV.
-      3. Fit AR(1): RV_t = a + b * RV_{t-1} + e_t.
-            kappa = -log(b)             (continuous-time mean reversion speed)
-            (or kappa = (1-b)*trading_days for daily-step interpretation)
-         We use the continuous-time form.
-      4. sigma_v = std(e_t) / sqrt(mean(RV_t)) * sqrt(trading_days)
-         (standardized so that the units match dv = sigma_v*sqrt(v)*dW).
+      3. Fit AR(1) on RV; extract continuous-time kappa from the AR
+         coefficient.
+      4. sigma_v = std(residuals) standardized by sqrt(theta * dt).
       5. rho = correlation between log returns and changes in RV.
-      6. v0 = most recent RV value (front-loads simulations toward today's regime).
+      6. v0 = most recent RV value.
 
-    This procedure is documented in standard quant references (Mikhailov &
-    Nogel 2003, Aits-Sahalia & Kimmel 2007). It is the "first-pass"
-    calibration -- production desks would refine via option-implied
-    surfaces, but for historical-only equity calibration this is appropriate.
+    Reference: Mikhailov & Nogel (2003), Aits-Sahalia & Kimmel (2007).
 
-    Parameters
-    ----------
-    log_returns : pd.Series
-        Daily log returns.
-    trading_days : int
-        Trading-day convention.
-    rv_window : int
-        Rolling window for realized variance estimation. 21 days
-        approximates one calendar month, a common choice.
+    Note: this method makes no attempt to enforce the Feller condition
+    2*kappa*theta > sigma_v^2. For high-vol-of-vol assets (e.g. equities
+    during 2020-2022) this routinely produces Feller-violating estimates.
+    The full-truncation Euler scheme handles violations correctly at
+    simulation time, but a Feller-compliant alternative is provided in
+    `calibrate_heston_constrained`.
     """
     returns = log_returns.dropna()
 
-    # Step 1: Annualized realized variance, rolling window
+    # Step 1: annualized realized variance
     squared = returns ** 2
     rv = squared.rolling(window=rv_window).sum() * (trading_days / rv_window)
     rv = rv.dropna()
@@ -288,25 +350,18 @@ def calibrate_heston(
     # Step 3: AR(1) on RV
     rv_curr = rv.values[1:]
     rv_lag = rv.values[:-1]
-    # OLS: RV_t = a + b * RV_{t-1}
     X = np.vstack([np.ones_like(rv_lag), rv_lag]).T
     coeffs, *_ = np.linalg.lstsq(X, rv_curr, rcond=None)
     a, b = float(coeffs[0]), float(coeffs[1])
     residuals = rv_curr - (a + b * rv_lag)
 
-    # Continuous-time kappa from AR(1) coefficient
-    # If b = exp(-kappa * dt) then kappa = -log(b) / dt
     dt = 1.0 / trading_days
     if 0 < b < 1:
         kappa = float(-np.log(b) / dt)
     else:
-        # AR(1) coefficient outside (0,1) -- fall back to (1-b)/dt
-        # which is the small-dt approximation, and floor at a sensible value.
         kappa = float(max((1.0 - b) / dt, 0.5))
 
     # Step 4: sigma_v from residual std
-    # Heston: dv ~ sigma_v * sqrt(v) * dW => std(dv) ~ sigma_v * sqrt(v) * sqrt(dt)
-    # Using mean(v) = theta as the level:
     sigma_v = float(np.std(residuals, ddof=1) / np.sqrt(theta * dt))
 
     # Step 5: correlation between price returns and RV changes
@@ -314,15 +369,12 @@ def calibrate_heston(
     aligned_returns = returns.loc[rv_changes.index]
     rho = float(aligned_returns.corr(rv_changes))
     if not np.isfinite(rho):
-        rho = -0.5  # sensible default for equities
-
-    # Clip rho to avoid numerical issues at the boundary
+        rho = -0.5
     rho = float(np.clip(rho, -0.95, 0.95))
 
-    # Step 6: initial variance = most recent RV
+    # Step 6: initial variance
     v0 = float(rv.iloc[-1])
 
-    # Drift estimate from log returns
     mu = float(returns.mean() * trading_days + 0.5 * theta)
 
     return HestonParams(
@@ -336,6 +388,91 @@ def calibrate_heston(
 
 
 # ============================================================
+# Heston -- Method B: Feller-constrained method of moments
+# ============================================================
+
+def calibrate_heston_constrained(
+    log_returns: pd.Series,
+    trading_days: int = 252,
+    rv_window: int = 21,
+    feller_margin: float = FELLER_MARGIN,
+) -> HestonParams:
+    """
+    Feller-constrained calibration of Heston.
+
+    This produces parameters identical to `calibrate_heston` but caps
+    sigma_v so the Feller condition holds with a small safety margin:
+
+        2 * kappa * theta >= (1 + feller_margin) * sigma_v^2
+
+    Equivalently:
+
+        sigma_v <= sqrt(2 * kappa * theta / (1 + feller_margin))
+
+    When the unconstrained estimate exceeds this cap, we cap it. This
+    guarantees the variance process remains strictly positive in the
+    continuous-time formulation, at the cost of slightly under-fitting
+    the empirical vol-of-vol.
+
+    Use this variant when:
+      - Theoretical guarantees on positivity matter (e.g. for analytical
+        results or risk calculations sensitive to the boundary).
+      - You want a "safer" calibration that avoids the full-truncation
+        regime entirely.
+
+    Use the unconstrained `calibrate_heston` when:
+      - Empirical fit to realized vol-of-vol matters more than theoretical
+        purity (typical for equity option pricing).
+
+    The notebook reports both side-by-side.
+    """
+    # Get the unconstrained calibration first
+    p = calibrate_heston(log_returns, trading_days, rv_window)
+
+    # Compute Feller cap
+    feller_cap = float(np.sqrt(2 * p.kappa * p.theta / (1.0 + feller_margin)))
+
+    # Cap sigma_v if it exceeds the Feller-compliant ceiling
+    sigma_v_constrained = float(min(p.sigma_v, feller_cap))
+
+    return HestonParams(
+        mu=p.mu,
+        kappa=p.kappa,
+        theta=p.theta,
+        sigma_v=sigma_v_constrained,
+        rho=p.rho,
+        v0=p.v0,
+    )
+
+
+# ============================================================
+# Goodness-of-fit tests
+# ============================================================
+
+def ks_test_returns(
+    empirical_returns: np.ndarray,
+    simulated_returns: np.ndarray,
+) -> tuple[float, float]:
+    """
+    Two-sample Kolmogorov-Smirnov test comparing empirical and simulated
+    return distributions.
+
+    Returns
+    -------
+    (ks_statistic, p_value)
+        Lower KS statistic = better fit. p-value > 0.05 means we fail to
+        reject the null that both samples come from the same distribution
+        (i.e. the model fits the data at the 5% level).
+    """
+    # Suppress the warning about ties (returns can have duplicate values
+    # at high precision); the test is still valid.
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")
+        result = ks_2samp(empirical_returns, simulated_returns)
+    return float(result.statistic), float(result.pvalue)
+
+
+# ============================================================
 # Convenience: calibrate all models for one asset
 # ============================================================
 
@@ -343,15 +480,43 @@ def calibrate_all_models(
     prices: pd.Series,
     log_returns: pd.Series,
     trading_days: int = 252,
+    cev_method: str = "nls",
+    heston_constrained: bool = False,
 ) -> dict:
     """
     Calibrate all four models for a single asset.
 
-    Returns a dict keyed by model name with the calibrated Params object.
+    Parameters
+    ----------
+    prices, log_returns : pd.Series
+        Price and log-return series.
+    trading_days : int
+        Trading-day convention.
+    cev_method : {'nls', 'ols'}
+        Which CEV calibrator to use. 'nls' is the recommended robust method.
+    heston_constrained : bool
+        If True, use the Feller-constrained Heston calibrator.
+
+    Returns
+    -------
+    dict
+        Keyed by model name with the calibrated Params object.
     """
+    if cev_method == "nls":
+        cev_params = calibrate_cev_nls(prices, log_returns, trading_days)
+    elif cev_method == "ols":
+        cev_params = calibrate_cev(prices, log_returns, trading_days)
+    else:
+        raise ValueError(f"Unknown cev_method: {cev_method!r}. Use 'nls' or 'ols'.")
+
+    if heston_constrained:
+        heston_params = calibrate_heston_constrained(log_returns, trading_days)
+    else:
+        heston_params = calibrate_heston(log_returns, trading_days)
+
     return {
         "GBM":    calibrate_gbm(log_returns, trading_days),
         "Merton": calibrate_merton(log_returns, trading_days),
-        "CEV":    calibrate_cev(prices, log_returns, trading_days),
-        "Heston": calibrate_heston(log_returns, trading_days),
+        "CEV":    cev_params,
+        "Heston": heston_params,
     }
