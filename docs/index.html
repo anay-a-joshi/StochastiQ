@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <meta name="description" content="StochastiQ — Multi-Model Portfolio Optimization with Stochastic Simulation, Options Overlay, and Regime-Conditional Validation. MGT 6081-A, Georgia Tech." />
 <meta name="theme-color" content="#050511" />
-<title>StochastiQ — MGT 6081-A Final Project</title>
+<title>StochastiQ - MGT 6081-A Final Project</title>
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
 <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
@@ -83,7 +83,11 @@ body::after {
 #splash {
   position: fixed;
   inset: 0;
-  background: #000;
+  background:
+    radial-gradient(ellipse 80% 50% at 50% 0%, rgba(168, 85, 247, 0.18), transparent 60%),
+    radial-gradient(ellipse 60% 40% at 15% 75%, rgba(0, 212, 255, 0.14), transparent 55%),
+    radial-gradient(ellipse 60% 40% at 85% 75%, rgba(255, 0, 110, 0.10), transparent 55%),
+    radial-gradient(ellipse 100% 100% at 50% 50%, #0a0a1f 0%, #050511 100%);
   z-index: 1000;
   display: flex;
   flex-direction: column;
@@ -93,14 +97,118 @@ body::after {
   overflow: hidden;
 }
 
-/* Subtle vignette + scanlines on splash */
+/* Slow drifting aurora */
 #splash::before {
   content: '';
   position: absolute;
-  inset: 0;
-  background: radial-gradient(ellipse at center, transparent 30%, rgba(0,0,0,0.7));
+  inset: -20%;
+  background:
+    radial-gradient(ellipse 40% 30% at 30% 20%, rgba(168, 85, 247, 0.12), transparent 50%),
+    radial-gradient(ellipse 30% 40% at 70% 40%, rgba(0, 212, 255, 0.10), transparent 50%);
+  animation: splash-drift 30s ease-in-out infinite alternate;
   pointer-events: none;
+  z-index: 0;
 }
+
+@keyframes splash-drift {
+  0% { transform: translate(0, 0) scale(1); }
+  100% { transform: translate(5%, -5%) scale(1.15); }
+}
+
+/* Soft vignette to keep focus on center */
+#splash::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(ellipse 70% 70% at 50% 50%, transparent 30%, rgba(0,0,0,0.6) 100%);
+  pointer-events: none;
+  z-index: 1;
+}
+
+/* Twinkling stars */
+.star {
+  position: absolute;
+  background: #fff;
+  border-radius: 50%;
+  pointer-events: none;
+  z-index: 1;
+  animation: twinkle var(--dur, 3s) ease-in-out infinite;
+  animation-delay: var(--delay, 0s);
+}
+
+@keyframes twinkle {
+  0%, 100% { opacity: 0.15; transform: scale(0.8); }
+  50% { opacity: var(--max-op, 0.85); transform: scale(1.2); }
+}
+
+/* Moon in the top-right of the splash */
+.moon {
+  position: absolute;
+  top: 7%;
+  right: 8%;
+  width: clamp(60px, 8vw, 95px);
+  aspect-ratio: 1;
+  border-radius: 50%;
+  background:
+    radial-gradient(circle at 35% 30%,
+      #fffaf0 0%,
+      #f4ede0 30%,
+      #d8d0bf 60%,
+      #a8a08c 100%);
+  box-shadow:
+    0 0 40px rgba(255, 245, 220, 0.35),
+    0 0 90px rgba(255, 245, 220, 0.18),
+    0 0 140px rgba(200, 180, 140, 0.08),
+    inset -8px -10px 20px rgba(40, 30, 20, 0.4);
+  z-index: 1;
+  pointer-events: none;
+  animation: moon-glow 6s ease-in-out infinite alternate;
+}
+
+/* Subtle craters for depth */
+.moon::before,
+.moon::after {
+  content: '';
+  position: absolute;
+  border-radius: 50%;
+  background: rgba(70, 60, 45, 0.18);
+}
+
+.moon::before {
+  top: 22%;
+  left: 28%;
+  width: 14%;
+  height: 14%;
+}
+
+.moon::after {
+  top: 55%;
+  left: 50%;
+  width: 9%;
+  height: 9%;
+  background: rgba(70, 60, 45, 0.15);
+}
+
+@keyframes moon-glow {
+  0% {
+    box-shadow:
+      0 0 40px rgba(255, 245, 220, 0.35),
+      0 0 90px rgba(255, 245, 220, 0.18),
+      0 0 140px rgba(200, 180, 140, 0.08),
+      inset -8px -10px 20px rgba(40, 30, 20, 0.4);
+  }
+  100% {
+    box-shadow:
+      0 0 60px rgba(255, 245, 220, 0.5),
+      0 0 110px rgba(255, 245, 220, 0.25),
+      0 0 160px rgba(200, 180, 140, 0.12),
+      inset -8px -10px 20px rgba(40, 30, 20, 0.4);
+  }
+}
+
+/* Make sure name wrappers and skip button sit above background layers */
+.splash-name-wrapper { z-index: 2; }
+.skip-btn { z-index: 10; }
 
 #splash.fade-out {
   animation: splash-fade 0.6s ease forwards;
@@ -914,6 +1022,7 @@ footer {
      SPLASH SCREEN
      =================================================================== -->
 <div id="splash">
+  <div class="moon" aria-hidden="true"></div>
   <div class="splash-name-wrapper" data-idx="0">
     <span class="splash-name">ANAY ABHIJIT JOSHI</span>
     <span class="impact-flash"></span>
@@ -1000,7 +1109,7 @@ footer {
       <div class="stat-label">MC Paths/Model</div>
     </div>
     <div class="stat-card">
-      <div class="stat-value">34</div>
+      <div class="stat-value">35</div>
       <div class="stat-label">Pages of Report</div>
     </div>
     <div class="stat-card">
@@ -1081,7 +1190,7 @@ footer {
       <div class="phase-card">
         <div class="phase-num">PHASE 08</div>
         <div class="phase-title">Synthesis & Report</div>
-        <div class="phase-desc">Cross-phase aggregation notebook + 34-page LaTeX report with 17 figures, 9 tables, 21 academic references. Honest disclosure of negative findings and 7 explicit limitations.</div>
+        <div class="phase-desc">Cross-phase aggregation notebook + 35-page LaTeX report with 17 figures, 9 tables, 21 academic references. Honest disclosure of negative findings and 7 explicit limitations.</div>
         <div class="phase-tech">LaTeX · pdflatex + bibtex</div>
       </div>
     </div>
@@ -1162,15 +1271,14 @@ footer {
       </div>
     </div>
     <div class="course-note">
-      <br>
       <p>
         I (Anay Abhijit Joshi) would like to express my sincere gratitude to <strong>Professor Satyajit Karnik</strong>. 
         MGT 6081-A fundamentally changed the way I think about derivative securities and state-contingent risk. 
-        The framework you taught us - specifically coherent risk measures, stochastic-process modeling, and the rigor required to evaluate state-dependent payoffs - is what made this entire project possible.
+        The framework you taught us - specifically coherent risk measures, stochastic-process modeling, and the rigor required to evaluate state-dependent payoffs — is what made this entire project possible...
       </p>
       <p>
-          Coming from a <strong>Computer Science background</strong>, your lectures provided the necessary bridge to help me develop a genuine passion for finance. 
-          Every empirical decision in this work, from the choice of <strong>CVaR over Sharpe</strong> to the <strong>regime-conditional decomposition</strong>, traces back directly to the course goals of understanding pricing methodologies, risk-neutral frameworks, and simulations using stochastic differential equations...
+          Coming from a <strong>Computer Science background</strong>, your lectures provided the necessary bridge to help me develop a genuine passion for finance...
+          Every empirical decision in this work, from the choice of <strong>CVaR over Sharpe</strong> to the <strong>regime-conditional decomposition</strong>, traces back directly to the course goals of understanding pricing methodologies, risk-neutral frameworks, and simulations using stochastic differential equations.
       </p>
       <p>
           Thank you so much for your guidance and for demonstrating how to apply complex financial theory to specific, real-world examples...
@@ -1202,6 +1310,42 @@ footer {
   const main = document.getElementById('main');
   const skipBtn = document.getElementById('skipBtn');
   const wrappers = document.querySelectorAll('.splash-name-wrapper');
+
+  // Generate twinkling stars in the splash background
+  // Biased to upper third (where stones "fall from") and away from center where names land
+  const starCount = 70;
+  for (let s = 0; s < starCount; s++) {
+    const star = document.createElement('span');
+    star.className = 'star';
+    const x = Math.random() * 100;
+    let y;
+    if (Math.random() < 0.6) {
+      y = Math.random() * 35;
+    } else {
+      y = 65 + Math.random() * 35;
+    }
+    const size = Math.random() < 0.7 ? 1 : 2;
+    const maxOp = 0.4 + Math.random() * 0.5;
+    const dur = 2 + Math.random() * 4;
+    const delay = Math.random() * 5;
+    star.style.cssText = `
+      left: ${x}%;
+      top: ${y}%;
+      width: ${size}px;
+      height: ${size}px;
+      --max-op: ${maxOp};
+      --dur: ${dur}s;
+      --delay: ${delay}s;
+    `;
+    if (Math.random() < 0.1) {
+      star.style.background = '#00d4ff';
+      star.style.boxShadow = '0 0 4px rgba(0, 212, 255, 0.6)';
+    } else if (Math.random() < 0.05) {
+      star.style.background = '#ff006e';
+      star.style.boxShadow = '0 0 4px rgba(255, 0, 110, 0.5)';
+    }
+    splash.appendChild(star);
+  }
 
   // Pre-build particles + cracks for each name (12 particles, 9 cracks)
   wrappers.forEach((wrapper) => {
