@@ -1,0 +1,1308 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<meta name="description" content="StochastiQ — Multi-Model Portfolio Optimization with Stochastic Simulation, Options Overlay, and Regime-Conditional Validation. MGT 6081-A, Georgia Tech." />
+<meta name="theme-color" content="#050511" />
+<title>StochastiQ — MGT 6081-A Final Project</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
+<style>
+/* ===================================================================
+   RESET + ROOT
+   =================================================================== */
+*, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+html { scroll-behavior: smooth; }
+
+:root {
+  --bg: #050511;
+  --bg-elev: rgba(12, 14, 32, 0.6);
+  --cyan: #00d4ff;
+  --magenta: #ff006e;
+  --green: #00ff9d;
+  --purple: #a855f7;
+  --text: #e8edff;
+  --text-muted: #8b93b3;
+  --text-dim: #5a6080;
+  --border: rgba(0, 212, 255, 0.15);
+  --border-strong: rgba(0, 212, 255, 0.4);
+}
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: 'Space Grotesk', -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+  font-weight: 400;
+  line-height: 1.6;
+  overflow-x: hidden;
+  min-height: 100vh;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Animated aurora background */
+body::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  background:
+    radial-gradient(ellipse 60% 40% at 15% 20%, rgba(0, 212, 255, 0.18), transparent 60%),
+    radial-gradient(ellipse 50% 50% at 85% 30%, rgba(255, 0, 110, 0.12), transparent 60%),
+    radial-gradient(ellipse 70% 50% at 50% 80%, rgba(168, 85, 247, 0.08), transparent 60%);
+  z-index: -2;
+  animation: aurora 25s ease-in-out infinite alternate;
+}
+
+@keyframes aurora {
+  0% { transform: translate(0, 0) scale(1); }
+  100% { transform: translate(-3%, 3%) scale(1.08); }
+}
+
+/* Subtle grid overlay */
+body::after {
+  content: '';
+  position: fixed;
+  inset: 0;
+  background-image:
+    linear-gradient(rgba(0, 212, 255, 0.035) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(0, 212, 255, 0.035) 1px, transparent 1px);
+  background-size: 70px 70px;
+  z-index: -1;
+  pointer-events: none;
+  mask-image: radial-gradient(ellipse 80% 80% at 50% 50%, #000, transparent);
+  -webkit-mask-image: radial-gradient(ellipse 80% 80% at 50% 50%, #000, transparent);
+}
+
+::selection { background: var(--cyan); color: #000; }
+
+/* ===================================================================
+   SPLASH SCREEN — Names fall as stones with ground-breaking effect
+   =================================================================== */
+#splash {
+  position: fixed;
+  inset: 0;
+  background: #000;
+  z-index: 1000;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  gap: clamp(1rem, 3vh, 2rem);
+  overflow: hidden;
+}
+
+/* Subtle vignette + scanlines on splash */
+#splash::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(ellipse at center, transparent 30%, rgba(0,0,0,0.7));
+  pointer-events: none;
+}
+
+#splash.fade-out {
+  animation: splash-fade 0.6s ease forwards;
+}
+
+@keyframes splash-fade {
+  to { opacity: 0; visibility: hidden; }
+}
+
+#splash.shake { animation: shake 0.25s; }
+
+@keyframes shake {
+  0%, 100% { transform: translate(0, 0); }
+  20% { transform: translate(-5px, 3px); }
+  40% { transform: translate(5px, -3px); }
+  60% { transform: translate(-3px, -4px); }
+  80% { transform: translate(3px, 2px); }
+}
+
+.splash-name-wrapper {
+  position: relative;
+  display: inline-block;
+}
+
+.splash-name {
+  font-family: 'Space Grotesk', sans-serif;
+  font-weight: 700;
+  font-size: clamp(1.6rem, 5.5vw, 4rem);
+  letter-spacing: 0.06em;
+  color: #fff;
+  position: relative;
+  opacity: 0;
+  transform: translateY(-110vh) scale(0.7);
+  text-shadow:
+    0 0 20px rgba(0, 212, 255, 0.8),
+    0 0 40px rgba(0, 212, 255, 0.4),
+    0 4px 8px rgba(0, 0, 0, 0.5);
+  white-space: nowrap;
+  display: inline-block;
+}
+
+.splash-name.dropping {
+  animation: stone-drop 0.55s cubic-bezier(0.55, 0, 0.95, 0.55) forwards;
+}
+
+@keyframes stone-drop {
+  0% {
+    opacity: 0;
+    transform: translateY(-110vh) scale(0.7) rotate(-3deg);
+  }
+  15% { opacity: 1; }
+  90% {
+    opacity: 1;
+    transform: translateY(0) scale(1) rotate(0deg);
+  }
+  95% {
+    opacity: 1;
+    transform: translateY(-12px) scale(1.04) rotate(0.5deg);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0) scale(1) rotate(0deg);
+  }
+}
+
+/* Glow burst under the name on impact */
+.impact-flash {
+  position: absolute;
+  left: 50%;
+  bottom: -8px;
+  width: 110%;
+  height: 6px;
+  background: linear-gradient(90deg, transparent, var(--cyan) 30%, #fff 50%, var(--cyan) 70%, transparent);
+  transform: translateX(-50%) scaleX(0);
+  opacity: 0;
+  pointer-events: none;
+  filter: blur(1px);
+}
+
+.splash-name-wrapper.landed .impact-flash {
+  animation: flash-burst 0.7s ease-out;
+}
+
+@keyframes flash-burst {
+  0% { transform: translateX(-50%) scaleX(0); opacity: 1; }
+  40% { transform: translateX(-50%) scaleX(1.6); opacity: 1; }
+  100% { transform: translateX(-50%) scaleX(2.2); opacity: 0; }
+}
+
+/* Crack lines radiating from impact */
+.crack {
+  position: absolute;
+  bottom: -2px;
+  left: 50%;
+  width: 1.5px;
+  height: 0;
+  background: linear-gradient(to bottom, rgba(0, 212, 255, 0.9), transparent);
+  transform-origin: top center;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.splash-name-wrapper.landed .crack {
+  animation: crack-grow 0.5s ease-out forwards;
+}
+
+@keyframes crack-grow {
+  0% { height: 0; opacity: 1; }
+  60% { opacity: 1; }
+  100% { height: var(--len, 50px); opacity: 0; }
+}
+
+/* Debris particles flying outward */
+.particle {
+  position: absolute;
+  bottom: 0;
+  left: 50%;
+  width: 4px;
+  height: 4px;
+  background: var(--cyan);
+  border-radius: 50%;
+  pointer-events: none;
+  opacity: 0;
+  box-shadow: 0 0 8px var(--cyan);
+}
+
+.splash-name-wrapper.landed .particle {
+  animation: particle-fly 0.7s ease-out forwards;
+}
+
+@keyframes particle-fly {
+  0% {
+    opacity: 1;
+    transform: translate(-50%, 0) scale(1);
+  }
+  100% {
+    opacity: 0;
+    transform: translate(calc(-50% + var(--dx, 30px)), var(--dy, -40px)) scale(0.2);
+  }
+}
+
+/* Skip splash button */
+.skip-btn {
+  position: absolute;
+  bottom: 30px;
+  right: 30px;
+  background: transparent;
+  color: var(--text-muted);
+  border: 1px solid rgba(255,255,255,0.15);
+  padding: 0.5rem 1.2rem;
+  border-radius: 99px;
+  font-family: inherit;
+  font-size: 0.8rem;
+  letter-spacing: 0.1em;
+  cursor: pointer;
+  opacity: 0;
+  transition: all 0.3s;
+  z-index: 10;
+}
+
+.skip-btn.visible { opacity: 0.6; }
+.skip-btn:hover { opacity: 1; border-color: var(--cyan); color: var(--cyan); }
+
+/* ===================================================================
+   MAIN PAGE
+   =================================================================== */
+#main {
+  opacity: 0;
+  visibility: hidden;
+  min-height: 100vh;
+}
+
+#main.visible {
+  opacity: 1;
+  visibility: visible;
+  animation: main-enter 0.9s cubic-bezier(0.2, 0.7, 0.3, 1);
+}
+
+@keyframes main-enter {
+  from { opacity: 0; transform: translateY(30px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* ----- Top Navigation ----- */
+nav {
+  position: sticky;
+  top: 0;
+  z-index: 100;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 1.2rem clamp(1.5rem, 4vw, 3rem);
+  background: rgba(5, 5, 17, 0.75);
+  backdrop-filter: blur(20px) saturate(180%);
+  -webkit-backdrop-filter: blur(20px) saturate(180%);
+  border-bottom: 1px solid var(--border);
+}
+
+.logo {
+  font-size: 1.4rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  background: linear-gradient(135deg, var(--cyan), var(--magenta));
+  background-clip: text;
+  -webkit-background-clip: text;
+  color: transparent;
+  text-decoration: none;
+}
+
+.nav-links {
+  display: flex;
+  gap: 0.6rem;
+}
+
+.nav-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.55rem 0.9rem;
+  color: var(--text);
+  text-decoration: none;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: rgba(10, 12, 30, 0.4);
+  font-size: 0.85rem;
+  font-weight: 500;
+  transition: all 0.25s;
+}
+
+.nav-link:hover {
+  border-color: var(--cyan);
+  background: rgba(0, 212, 255, 0.1);
+  box-shadow: 0 0 24px rgba(0, 212, 255, 0.35), inset 0 0 12px rgba(0, 212, 255, 0.05);
+  transform: translateY(-1px);
+}
+
+.nav-link svg { width: 18px; height: 18px; flex-shrink: 0; }
+
+/* ----- Hero ----- */
+.hero {
+  text-align: center;
+  padding: clamp(4rem, 10vh, 8rem) 1.5rem clamp(3rem, 8vh, 5rem);
+  position: relative;
+}
+
+.hero h1 {
+  font-size: clamp(3.5rem, 12vw, 7.5rem);
+  font-weight: 700;
+  letter-spacing: -0.03em;
+  line-height: 1;
+  background: linear-gradient(135deg, #00d4ff 0%, #a855f7 50%, #ff006e 100%);
+  background-clip: text;
+  -webkit-background-clip: text;
+  color: transparent;
+  filter: drop-shadow(0 0 40px rgba(0, 212, 255, 0.4));
+  margin-bottom: 1.2rem;
+  animation: hero-glow 4s ease-in-out infinite alternate;
+}
+
+@keyframes hero-glow {
+  0% { filter: drop-shadow(0 0 40px rgba(0, 212, 255, 0.4)); }
+  100% { filter: drop-shadow(0 0 60px rgba(255, 0, 110, 0.4)); }
+}
+
+.tagline {
+  font-size: clamp(1rem, 2vw, 1.35rem);
+  color: var(--text-muted);
+  max-width: 760px;
+  margin: 0 auto 2.5rem;
+  font-weight: 300;
+  line-height: 1.5;
+}
+
+.meta {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 0.8rem;
+  flex-wrap: wrap;
+}
+
+.meta-pill {
+  padding: 0.55rem 1.1rem;
+  border: 1px solid var(--border);
+  border-radius: 99px;
+  font-size: 0.85rem;
+  font-family: 'JetBrains Mono', monospace;
+  color: var(--text-muted);
+  background: rgba(10, 12, 30, 0.4);
+}
+
+.grade-badge {
+  padding: 0.65rem 1.4rem;
+  background: linear-gradient(135deg, var(--green) 0%, var(--cyan) 100%);
+  color: #001;
+  font-weight: 700;
+  font-size: 1rem;
+  font-family: 'JetBrains Mono', monospace;
+  border-radius: 99px;
+  letter-spacing: 0.05em;
+  box-shadow: 0 0 30px rgba(0, 255, 157, 0.4), inset 0 1px 0 rgba(255,255,255,0.4);
+  animation: grade-pulse 2.5s ease-in-out infinite;
+  border: none;
+}
+
+@keyframes grade-pulse {
+  0%, 100% { box-shadow: 0 0 30px rgba(0, 255, 157, 0.4), inset 0 1px 0 rgba(255,255,255,0.4); }
+  50% { box-shadow: 0 0 50px rgba(0, 255, 157, 0.8), inset 0 1px 0 rgba(255,255,255,0.4); }
+}
+
+/* ----- Stats Bar ----- */
+.stats-bar {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 1rem;
+  max-width: 1200px;
+  margin: 3rem auto 5rem;
+  padding: 0 clamp(1.5rem, 4vw, 2rem);
+}
+
+.stat-card {
+  text-align: center;
+  padding: 1.8rem 1rem;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: var(--bg-elev);
+  backdrop-filter: blur(10px);
+  transition: all 0.3s cubic-bezier(0.2, 0.8, 0.3, 1);
+  cursor: default;
+}
+
+.stat-card:hover {
+  border-color: var(--cyan);
+  transform: translateY(-4px);
+  box-shadow: 0 12px 40px rgba(0, 212, 255, 0.18);
+}
+
+.stat-value {
+  font-size: clamp(1.8rem, 4vw, 2.6rem);
+  font-weight: 700;
+  background: linear-gradient(135deg, var(--cyan), var(--green));
+  background-clip: text;
+  -webkit-background-clip: text;
+  color: transparent;
+  font-family: 'JetBrains Mono', monospace;
+  letter-spacing: -0.02em;
+  line-height: 1;
+}
+
+.stat-label {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.15em;
+  margin-top: 0.6rem;
+  font-weight: 500;
+}
+
+/* ----- Sections ----- */
+section.content {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: clamp(3rem, 8vh, 6rem) clamp(1.5rem, 4vw, 2rem);
+}
+
+.section-tag {
+  display: inline-block;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.75rem;
+  letter-spacing: 0.2em;
+  color: var(--cyan);
+  text-transform: uppercase;
+  margin-bottom: 1rem;
+  padding: 0.3rem 0.8rem;
+  border: 1px solid var(--border-strong);
+  border-radius: 99px;
+  background: rgba(0, 212, 255, 0.05);
+}
+
+section.content h2 {
+  font-size: clamp(2rem, 4.5vw, 3.2rem);
+  font-weight: 700;
+  margin-bottom: 1rem;
+  letter-spacing: -0.02em;
+  background: linear-gradient(135deg, #fff 0%, #8b93b3 100%);
+  background-clip: text;
+  -webkit-background-clip: text;
+  color: transparent;
+  line-height: 1.1;
+}
+
+.section-subtitle {
+  color: var(--text-muted);
+  font-size: clamp(1rem, 1.4vw, 1.15rem);
+  max-width: 720px;
+  margin-bottom: 3rem;
+  line-height: 1.6;
+}
+
+/* ----- Overview text ----- */
+.overview-text p {
+  font-size: clamp(1rem, 1.3vw, 1.1rem);
+  line-height: 1.8;
+  color: var(--text);
+  max-width: 880px;
+  margin-bottom: 1.4rem;
+}
+
+.highlight {
+  color: var(--cyan);
+  font-weight: 500;
+}
+
+.highlight-pink {
+  color: var(--magenta);
+  font-weight: 500;
+}
+
+.highlight-green {
+  color: var(--green);
+  font-weight: 600;
+}
+
+/* ----- Phase Cards ----- */
+.phases-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 1.4rem;
+}
+
+.phase-card {
+  position: relative;
+  padding: 2rem 1.8rem;
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  background: var(--bg-elev);
+  backdrop-filter: blur(10px);
+  transition: all 0.35s cubic-bezier(0.2, 0.8, 0.3, 1);
+  overflow: hidden;
+}
+
+.phase-card::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: linear-gradient(90deg, var(--cyan), var(--magenta));
+  transform: scaleX(0);
+  transform-origin: left;
+  transition: transform 0.5s cubic-bezier(0.2, 0.8, 0.3, 1);
+}
+
+.phase-card::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(circle at top right, rgba(0, 212, 255, 0.06), transparent 60%);
+  opacity: 0;
+  transition: opacity 0.4s;
+  pointer-events: none;
+}
+
+.phase-card:hover {
+  border-color: var(--border-strong);
+  transform: translateY(-6px);
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.4), 0 0 30px rgba(0, 212, 255, 0.1);
+}
+
+.phase-card:hover::before { transform: scaleX(1); }
+.phase-card:hover::after { opacity: 1; }
+
+.phase-num {
+  display: inline-block;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.7rem;
+  color: var(--cyan);
+  letter-spacing: 0.25em;
+  margin-bottom: 0.7rem;
+  padding: 0.25rem 0.7rem;
+  border: 1px solid var(--border-strong);
+  border-radius: 4px;
+  background: rgba(0, 212, 255, 0.08);
+}
+
+.phase-title {
+  font-size: 1.25rem;
+  font-weight: 600;
+  margin-bottom: 0.7rem;
+  color: var(--text);
+  letter-spacing: -0.01em;
+}
+
+.phase-desc {
+  color: var(--text-muted);
+  line-height: 1.65;
+  font-size: 0.95rem;
+}
+
+.phase-tech {
+  margin-top: 1rem;
+  padding-top: 1rem;
+  border-top: 1px solid rgba(0, 212, 255, 0.08);
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.75rem;
+  color: var(--text-dim);
+  letter-spacing: 0.05em;
+}
+
+/* ----- Findings (the big result reveal) ----- */
+.findings {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1.5rem;
+  margin-top: 3rem;
+}
+
+@media (max-width: 768px) {
+  .findings { grid-template-columns: 1fr; }
+}
+
+.finding-card {
+  padding: 2.5rem 2rem;
+  border-radius: 18px;
+  position: relative;
+  overflow: hidden;
+  backdrop-filter: blur(10px);
+}
+
+.finding-card.negative {
+  background: linear-gradient(135deg, rgba(107, 114, 128, 0.1), rgba(40, 45, 65, 0.1));
+  border: 1px solid rgba(139, 147, 179, 0.25);
+}
+
+.finding-card.positive {
+  background: linear-gradient(135deg, rgba(0, 255, 157, 0.08), rgba(0, 212, 255, 0.04));
+  border: 1px solid rgba(0, 255, 157, 0.35);
+  box-shadow: 0 0 40px rgba(0, 255, 157, 0.1), inset 0 0 60px rgba(0, 255, 157, 0.03);
+}
+
+.finding-label {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.75rem;
+  letter-spacing: 0.2em;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  margin-bottom: 0.8rem;
+}
+
+.finding-card.positive .finding-label { color: var(--green); }
+
+.finding-headline {
+  font-size: clamp(1.5rem, 3vw, 2rem);
+  font-weight: 700;
+  margin-bottom: 1.2rem;
+  letter-spacing: -0.01em;
+  line-height: 1.2;
+}
+
+.finding-card.positive .finding-headline {
+  color: var(--green);
+  text-shadow: 0 0 30px rgba(0, 255, 157, 0.3);
+}
+
+.finding-numbers {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.9rem;
+  line-height: 2;
+  color: var(--text);
+  margin-bottom: 1.2rem;
+}
+
+.finding-numbers .num {
+  color: var(--cyan);
+  font-weight: 600;
+}
+
+.finding-card.positive .finding-numbers .num { color: var(--green); }
+
+.finding-explainer {
+  color: var(--text-muted);
+  font-size: 0.95rem;
+  line-height: 1.7;
+}
+
+/* ----- Model verdict ----- */
+.model-verdict {
+  margin-top: 4rem;
+  padding: 3rem 2.5rem;
+  border-radius: 20px;
+  background: linear-gradient(135deg, rgba(168, 85, 247, 0.08), rgba(255, 0, 110, 0.05));
+  border: 1px solid rgba(168, 85, 247, 0.25);
+  text-align: center;
+}
+
+.verdict-question {
+  font-style: italic;
+  color: var(--text-muted);
+  margin-bottom: 1.5rem;
+  font-size: 1.05rem;
+}
+
+.verdict-answer {
+  font-size: clamp(1.4rem, 3vw, 2rem);
+  font-weight: 700;
+  margin-bottom: 1rem;
+  letter-spacing: -0.01em;
+}
+
+.verdict-rank {
+  display: inline-flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  justify-content: center;
+  margin-top: 1.5rem;
+}
+
+.verdict-pill {
+  padding: 0.45rem 1rem;
+  border-radius: 99px;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.8rem;
+  font-weight: 500;
+  letter-spacing: 0.05em;
+}
+
+.verdict-pill.gold {
+  background: linear-gradient(135deg, #fbbf24, #f59e0b);
+  color: #1a1100;
+  box-shadow: 0 0 20px rgba(251, 191, 36, 0.4);
+}
+
+.verdict-pill.silver {
+  background: linear-gradient(135deg, #d4d4d8, #a1a1aa);
+  color: #18181b;
+}
+
+.verdict-pill.dim {
+  background: rgba(255,255,255,0.06);
+  color: var(--text-muted);
+  border: 1px solid rgba(255,255,255,0.1);
+}
+
+/* ----- Tech Stack ----- */
+.tech-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 1rem;
+  margin-top: 1rem;
+}
+
+.tech-item {
+  padding: 1rem 1.2rem;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--bg-elev);
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.85rem;
+  transition: all 0.25s;
+}
+
+.tech-item:hover {
+  border-color: var(--cyan);
+  transform: translateY(-2px);
+  box-shadow: 0 8px 24px rgba(0, 212, 255, 0.15);
+}
+
+.tech-item .label {
+  color: var(--text-dim);
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  margin-bottom: 0.3rem;
+}
+
+.tech-item .name {
+  color: var(--text);
+  font-weight: 500;
+}
+
+/* ----- Thank you ----- */
+.thanks-section {
+  text-align: center;
+  padding: clamp(4rem, 10vh, 7rem) 1.5rem;
+  border-top: 1px solid var(--border);
+  background: radial-gradient(ellipse at center top, rgba(168, 85, 247, 0.06), transparent 60%);
+}
+
+.thanks-headline-wrapper {
+  display: inline-block;
+  position: relative;
+  margin-bottom: 2rem;
+}
+
+.thanks-headline {
+  display: inline-block;
+  padding: 1rem 2rem;
+  font-size: clamp(1.1rem, 2.6vw, 1.6rem);
+  font-weight: 600;
+  background: linear-gradient(135deg, rgba(0, 212, 255, 0.12), rgba(255, 0, 110, 0.12));
+  border: 1px solid var(--border-strong);
+  border-radius: 99px;
+  color: var(--text);
+  box-shadow: 0 0 50px rgba(0, 212, 255, 0.2), inset 0 1px 0 rgba(255, 255, 255, 0.05);
+  letter-spacing: 0.01em;
+}
+
+.thanks-headline strong {
+  background: linear-gradient(135deg, var(--cyan), var(--magenta));
+  background-clip: text;
+  -webkit-background-clip: text;
+  color: transparent;
+  font-weight: 700;
+}
+
+.course-note {
+  max-width: 720px;
+  margin: 0 auto;
+  color: var(--text-muted);
+  font-size: clamp(1rem, 1.3vw, 1.1rem);
+  line-height: 1.8;
+}
+
+.course-note p { margin-bottom: 1rem; }
+.course-note p:last-child { margin-bottom: 0; }
+
+/* ----- Footer ----- */
+footer {
+  text-align: center;
+  padding: 3rem 1.5rem 4rem;
+  border-top: 1px solid var(--border);
+  background: rgba(0, 0, 0, 0.3);
+}
+
+.footer-built {
+  font-size: 0.95rem;
+  color: var(--text-muted);
+  margin-bottom: 1.2rem;
+}
+
+.footer-built strong {
+  background: linear-gradient(135deg, var(--cyan), var(--green));
+  background-clip: text;
+  -webkit-background-clip: text;
+  color: transparent;
+  font-weight: 700;
+  font-size: 1.05em;
+}
+
+.footer-team {
+  font-size: 0.78rem;
+  color: var(--text-dim);
+  font-family: 'JetBrains Mono', monospace;
+  letter-spacing: 0.05em;
+  margin-bottom: 1rem;
+}
+
+.footer-meta {
+  font-size: 0.75rem;
+  color: var(--text-dim);
+  font-family: 'JetBrains Mono', monospace;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.footer-meta a {
+  color: var(--cyan);
+  text-decoration: none;
+}
+
+.footer-meta a:hover { text-decoration: underline; }
+
+/* ----- Reveal on scroll ----- */
+.reveal {
+  opacity: 0;
+  transform: translateY(40px);
+  transition: opacity 0.8s cubic-bezier(0.2, 0.7, 0.3, 1), transform 0.8s cubic-bezier(0.2, 0.7, 0.3, 1);
+}
+
+.reveal.in-view {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+/* ----- Mobile ----- */
+@media (max-width: 768px) {
+  nav { padding: 0.9rem 1rem; }
+  .logo { font-size: 1.2rem; }
+  .nav-link { padding: 0.5rem 0.7rem; font-size: 0.8rem; }
+  .nav-link span { display: none; }
+  .meta-pill { font-size: 0.75rem; padding: 0.4rem 0.8rem; }
+  .grade-badge { font-size: 0.85rem; padding: 0.5rem 1rem; }
+}
+
+/* ----- Reduced motion ----- */
+@media (prefers-reduced-motion: reduce) {
+  #splash { display: none; }
+  #main { opacity: 1; visibility: visible; }
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+  .reveal { opacity: 1; transform: none; }
+}
+</style>
+</head>
+<body>
+
+<!-- ===================================================================
+     SPLASH SCREEN
+     =================================================================== -->
+<div id="splash">
+  <div class="splash-name-wrapper" data-idx="0">
+    <span class="splash-name">ANAY ABHIJIT JOSHI</span>
+    <span class="impact-flash"></span>
+  </div>
+  <div class="splash-name-wrapper" data-idx="1">
+    <span class="splash-name">VIDHI CHATURVEDI</span>
+    <span class="impact-flash"></span>
+  </div>
+  <div class="splash-name-wrapper" data-idx="2">
+    <span class="splash-name">SRIYA NELLURI</span>
+    <span class="impact-flash"></span>
+  </div>
+  <div class="splash-name-wrapper" data-idx="3">
+    <span class="splash-name">HIMANSHU BHATT</span>
+    <span class="impact-flash"></span>
+  </div>
+  <button class="skip-btn" id="skipBtn" aria-label="Skip intro">SKIP</button>
+</div>
+
+<!-- ===================================================================
+     MAIN PAGE
+     =================================================================== -->
+<div id="main">
+
+  <!-- Top Nav -->
+  <nav>
+    <a href="#" class="logo">StochastiQ</a>
+    <div class="nav-links">
+      <a class="nav-link" href="https://github.com/anay-a-joshi/StochastiQ" target="_blank" rel="noopener" aria-label="GitHub Repository">
+        <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 .297c-6.63 0-12 5.373-12 12 0 5.303 3.438 9.8 8.205 11.385.6.113.82-.258.82-.577 0-.285-.01-1.04-.015-2.04-3.338.724-4.042-1.61-4.042-1.61C4.422 18.07 3.633 17.7 3.633 17.7c-1.087-.744.084-.729.084-.729 1.205.084 1.838 1.236 1.838 1.236 1.07 1.835 2.809 1.305 3.495.998.108-.776.417-1.305.76-1.605-2.665-.3-5.466-1.332-5.466-5.93 0-1.31.465-2.38 1.235-3.22-.135-.303-.54-1.523.105-3.176 0 0 1.005-.322 3.3 1.23.96-.267 1.98-.399 3-.405 1.02.006 2.04.138 3 .405 2.28-1.552 3.285-1.23 3.285-1.23.645 1.653.24 2.873.12 3.176.765.84 1.23 1.91 1.23 3.22 0 4.61-2.805 5.625-5.475 5.92.42.36.81 1.096.81 2.22 0 1.606-.015 2.896-.015 3.286 0 .315.21.69.825.57C20.565 22.092 24 17.592 24 12.297c0-6.627-5.373-12-12-12"/></svg>
+        <span>GitHub</span>
+      </a>
+      <a class="nav-link" href="https://github.com/anay-a-joshi/StochastiQ/tree/main/notebooks" target="_blank" rel="noopener" aria-label="Notebooks">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="9" y1="13" x2="15" y2="13"/><line x1="9" y1="17" x2="15" y2="17"/></svg>
+        <span>Python Notebooks</span>
+      </a>
+      <a class="nav-link" href="https://github.com/anay-a-joshi/StochastiQ/tree/main/reports/figures" target="_blank" rel="noopener" aria-label="Figures">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
+        <span>Figures</span>
+      </a>
+      <a class="nav-link" href="https://github.com/anay-a-joshi/StochastiQ/blob/main/reports/StochastiQ_Final_Report.pdf" target="_blank" rel="noopener" aria-label="Report">
+        <!-- <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg> -->
+        <!-- File Icon for PDF Report -->
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+          <polyline points="14 2 14 8 20 8"></polyline>
+          <line x1="16" y1="13" x2="8" y2="13"></line>
+          <line x1="16" y1="17" x2="8" y2="17"></line>
+          <polyline points="10 9 9 9 8 9"></polyline>
+        </svg>
+        <span>PDF Report</span>
+      </a>
+    </div>
+  </nav>
+
+  <!-- Hero -->
+  <header class="hero">
+    <h1>StochastiQ</h1>
+    <p class="tagline">Multi-Model Portfolio Optimization with Stochastic Simulation, Options Overlay, and Regime-Conditional Validation</p>
+    <div class="meta">
+      <span class="meta-pill">MGT 6081-A · Spring 2026</span>
+      <span class="meta-pill">Professor Satyajit Karnik</span>
+      <span class="meta-pill">Georgia Tech MS-QCF</span>
+      <span class="grade-badge">100 / 100</span>
+    </div>
+  </header>
+
+  <!-- Stats Bar -->
+  <div class="stats-bar reveal">
+    <div class="stat-card">
+      <div class="stat-value">8</div>
+      <div class="stat-label">Phases</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-value">7</div>
+      <div class="stat-label">Assets</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-value">4</div>
+      <div class="stat-label">Stochastic Models</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-value">5K</div>
+      <div class="stat-label">MC Paths/Model</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-value">34</div>
+      <div class="stat-label">Pages of Report</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-value">21</div>
+      <div class="stat-label">Academic Refs</div>
+    </div>
+  </div>
+
+  <!-- Overview -->
+  <section class="content reveal">
+    <span class="section-tag">Overview</span>
+    <h2>What we built.</h2>
+    <p class="section-subtitle">A complete falsifiable empirical pipeline for multi-model portfolio construction, from raw data through statistically rigorous out-of-sample validation.</p>
+    <div class="overview-text">
+      <p>
+        We selected a <span class="highlight">seven-asset universe</span> (AAPL, MSFT, JPM, JNJ, XOM, SPY, GLD) spanning equity sectors, geography, and asset classes. We pulled five years of daily price data via <span class="highlight">yfinance</span> (1,257 training days from 2020 through 2024), holding back the most recent 16 months (332 trading days) as a strict out-of-sample window - never touched during model fitting.
+      </p>
+      <p>
+        On the training period we calibrated four stochastic-process models for each ticker: <span class="highlight">Geometric Brownian Motion, Merton jump-diffusion, Constant Elasticity of Variance, and Heston stochastic volatility</span>. We then ran 5,000 correlated Monte Carlo paths per model with Cholesky-injected cross-asset correlation, and built seven optimized portfolios on top: per-model maximum-Sharpe allocations, plus three model-robust formulations (min-max worst-case, equal-blend, KS-weighted blend).
+      </p>
+      <p>
+        We added a <span class="highlight">Black-Scholes-Merton options overlay</span> with three classical strategies (covered call, protective put, collar), then validated everything out-of-sample using a <span class="highlight-pink">stationary block-bootstrap</span> with paired Sharpe-difference inference and <span class="highlight-pink">pre-registered decision rules</span>. Finally, we conditioned the entire analysis on market regime via a two-state Hidden Markov Model anchored to the VIX, applied <span class="highlight-pink">Holm-Bonferroni multiple-testing correction</span> across 14 paired tests, and decomposed performance into Calm-day vs. Stress-day <span class="highlight-pink">CVaR</span>.
+      </p>
+      <p>
+        The project frames as <span class="highlight-green">Project Idea 6</span> (independent direction, instructor-approved) and incorporates the full blueprint of <span class="highlight-green">Project Idea 1</span> while substantially extending it on the validation, regime-conditioning, and coherent-risk-measure axes.
+      </p>
+    </div>
+  </section>
+
+  <!-- Phases -->
+  <section class="content reveal">
+    <span class="section-tag">The Pipeline</span>
+    <h2>Eight phases, one cohesive system.</h2>
+    <p class="section-subtitle">Each phase is a self-contained, runnable contribution committed and pushed independently. The full Git history is preserved in the repository.</p>
+    <div class="phases-grid">
+      <div class="phase-card">
+        <div class="phase-num">PHASE 01</div>
+        <div class="phase-title">Data Ingestion</div>
+        <div class="phase-desc">Pulled 5 years of daily adjusted close prices for 7 assets via yfinance. Computed log returns, sanity-checked stylized facts (vol clustering, fat tails, drawdowns).</div>
+        <div class="phase-tech">yfinance · pandas · numpy</div>
+      </div>
+      <div class="phase-card">
+        <div class="phase-num">PHASE 02</div>
+        <div class="phase-title">Markowitz Baseline</div>
+        <div class="phase-desc">Mean-variance frontier with five canonical portfolios: Max Sharpe, Min Variance, Max Sortino, Min CVaR (95%), Risk Parity. Used as reference, not production.</div>
+        <div class="phase-tech">scipy.optimize · SLSQP</div>
+      </div>
+      <div class="phase-card">
+        <div class="phase-num">PHASE 03</div>
+        <div class="phase-title">Stochastic Calibration</div>
+        <div class="phase-desc">Calibrated GBM, Merton jump-diffusion, CEV, and Heston for each ticker. MLE for GBM/Merton, method-of-moments for CEV, moment-matching for Heston with Feller verification.</div>
+        <div class="phase-tech">154 calibrated parameters · 4 models × 7 assets</div>
+      </div>
+      <div class="phase-card">
+        <div class="phase-num">PHASE 04</div>
+        <div class="phase-title">Robust Optimization</div>
+        <div class="phase-desc">5,000 correlated MC paths per model. Per-model Max-Sharpe portfolios + three robust aggregations: min-max worst-case, equal-blend, KS-distance-weighted blend. 30% per-asset cap.</div>
+        <div class="phase-tech">Cholesky correlation · Ben-Tal-Nemirovski</div>
+      </div>
+      <div class="phase-card">
+        <div class="phase-num">PHASE 05</div>
+        <div class="phase-title">Options Overlay</div>
+        <div class="phase-desc">Black-Scholes-Merton pricing for three classical strategies: 30-day covered call (K=1.05·S₀), protective put (K=0.95·S₀), collar (zero-cost combination). Greeks computed analytically.</div>
+        <div class="phase-tech">BSM · Greeks · put-call parity</div>
+      </div>
+      <div class="phase-card">
+        <div class="phase-num">PHASE 06</div>
+        <div class="phase-title">OOS Validation</div>
+        <div class="phase-desc">Paired stationary block-bootstrap (B=5,000) on Sharpe difference vs Equal-Weighted benchmark. Pre-registered decision rules (Validated / Falsified / Underpowered).</div>
+        <div class="phase-tech">Politis-Romano · 332-day OOS</div>
+      </div>
+      <div class="phase-card">
+        <div class="phase-num">PHASE 07</div>
+        <div class="phase-title">Regime Analysis</div>
+        <div class="phase-desc">Two-state Gaussian HMM on SPY returns. External validation against VIX (+15.7-pt premium). Regime-conditional Sharpe + CVaR. Holm-Bonferroni across 14 paired tests.</div>
+        <div class="phase-tech">hmmlearn · forward-backward filter</div>
+      </div>
+      <div class="phase-card">
+        <div class="phase-num">PHASE 08</div>
+        <div class="phase-title">Synthesis & Report</div>
+        <div class="phase-desc">Cross-phase aggregation notebook + 34-page LaTeX report with 17 figures, 9 tables, 21 academic references. Honest disclosure of negative findings and 7 explicit limitations.</div>
+        <div class="phase-tech">LaTeX · pdflatex + bibtex</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Key Findings -->
+  <section class="content reveal">
+    <span class="section-tag">Key Findings</span>
+    <h2>Same data. Different verdict.</h2>
+    <p class="section-subtitle">The central methodological insight of the project: a strategy designed to manage state-contingent risk must be evaluated using a state-contingent risk metric. Sharpe ratio averages over both regimes; CVaR conditions on the left tail.</p>
+
+    <div class="findings">
+      <div class="finding-card negative">
+        <div class="finding-label">Phase 6 · Sharpe Ratio</div>
+        <div class="finding-headline">Statistically null on Sharpe</div>
+        <div class="finding-numbers">
+          Δ = <span class="num">−0.443</span><br/>
+          95% CI = <span class="num">[−1.40, +0.21]</span><br/>
+          p-value = <span class="num">0.288</span><br/>
+          Verdict = <span class="num">Underpowered</span>
+        </div>
+        <div class="finding-explainer">
+          The textbook DeMiguel-Garlappi-Uppal puzzle. With only 332 OOS days, estimation noise dominates whatever true performance gap exists between Min-max and the naïve 1/N benchmark. We report this honestly.
+        </div>
+      </div>
+
+      <div class="finding-card positive">
+        <div class="finding-label">Phase 7 · CVaR · 95%</div>
+        <div class="finding-headline">All 7 portfolios beat the benchmark on Stress CVaR</div>
+        <div class="finding-numbers">
+          Per-Heston: <span class="num">+62 bps</span> (best)<br/>
+          Per-Merton: <span class="num">+60 bps</span><br/>
+          Min-max: <span class="num">+53 bps</span><br/>
+          Calm CVaR: <span class="num">all worse</span> (cost of insurance)
+        </div>
+        <div class="finding-explainer">
+          The textbook signature of a tail-risk-insurance design: better stress-day tail loss at the cost of marginally worse calm-day tail loss. Anchored in the coherent-risk-measure framework of Artzner et al. (1999).
+        </div>
+      </div>
+    </div>
+
+    <div class="model-verdict">
+      <div class="verdict-question">"Which models do you think are more pertaining for the future?" — Project Idea 1</div>
+      <div class="verdict-answer">
+        <span class="highlight">Heston</span> stochastic volatility, with <span class="highlight-pink">Merton</span> jump-diffusion a close second.
+      </div>
+      <div class="verdict-rank">
+        <span class="verdict-pill gold">🥇 HESTON · 62 BPS</span>
+        <span class="verdict-pill silver">🥈 MERTON · 60 BPS</span>
+        <span class="verdict-pill dim">GBM/MIN-MAX · 53 BPS</span>
+        <span class="verdict-pill dim">CEV · 4 BPS</span>
+      </div>
+    </div>
+  </section>
+
+  <!-- Tech Stack -->
+  <section class="content reveal">
+    <span class="section-tag">Stack</span>
+    <h2>Built end-to-end in Python.</h2>
+    <p class="section-subtitle">Production-grade source code under <code style="color:var(--cyan);font-family:'JetBrains Mono',monospace">src/</code>, eight Jupyter notebooks orchestrating the pipeline, fully reproducible from a single seed.</p>
+    <div class="tech-grid">
+      <div class="tech-item"><div class="label">Language</div><div class="name">Python 3.12</div></div>
+      <div class="tech-item"><div class="label">Data</div><div class="name">yfinance · pandas</div></div>
+      <div class="tech-item"><div class="label">Optimization</div><div class="name">scipy.optimize · SLSQP</div></div>
+      <div class="tech-item"><div class="label">HMM</div><div class="name">hmmlearn</div></div>
+      <div class="tech-item"><div class="label">Storage</div><div class="name">parquet · pyarrow</div></div>
+      <div class="tech-item"><div class="label">Plotting</div><div class="name">matplotlib · seaborn</div></div>
+      <div class="tech-item"><div class="label">Notebooks</div><div class="name">JupyterLab</div></div>
+      <div class="tech-item"><div class="label">Report</div><div class="name">LaTeX · pdflatex + bibtex</div></div>
+    </div>
+  </section>
+
+  <!-- Thank You -->
+  <section class="thanks-section">
+    <div class="thanks-headline-wrapper">
+      <div class="thanks-headline">
+        🙏 Thank you, <strong>Professor Satyajit Karnik</strong>, for an amazing semester...
+      </div>
+    </div>
+    <div class="course-note">
+      <p>
+        I (Anay Abhijit Joshi) would like to express my sincere gratitude to <strong>Professor Satyajit Karnik</strong>[cite: 1]. 
+        MGT 6081-A fundamentally changed the way I think about derivative securities and state-contingent risk[cite: 1]. 
+        The framework you taught us—specifically coherent risk measures, stochastic-process modeling, and the rigor required to evaluate state-dependent payoffs—is what made this entire project possible[cite: 1].
+      </p>
+      <p>
+          Coming from a <strong>Computer Science background</strong>, your lectures provided the necessary bridge to help me develop a genuine passion for finance[cite: 1]. 
+          Every empirical decision in this work, from the choice of <strong>CVaR over Sharpe</strong> to the <strong>regime-conditional decomposition</strong>, traces back directly to the course goals of understanding pricing methodologies, risk-neutral frameworks, and simulations using stochastic differential equations[cite: 1].
+      </p>
+      <p>
+          Thank you so much for your guidance and for demonstrating how to apply complex financial theory to specific, real-world examples[cite: 1].
+      </p>
+    </div>
+  </section>
+
+  <!-- Footer -->
+  <footer>
+    <div class="footer-built">
+      Site designed &amp; developed by <strong>Anay Abhijit Joshi</strong>
+    </div>
+    <div class="footer-team">
+      Team : Anay Abhijit Joshi , Vidhi Chaturvedi , Sriya Nelluri , Himanshu Bhatt
+    </div>
+    <div class="footer-meta">
+      MGT 6081-A · Spring 2026 · Georgia Tech MS-QCF · <a href="https://github.com/anay-a-joshi/StochastiQ" target="_blank" rel="noopener">github.com/anay-a-joshi/StochastiQ</a>
+    </div>
+  </footer>
+
+</div><!-- /#main -->
+
+<script>
+// ===================================================================
+// SPLASH ANIMATION
+// ===================================================================
+(function() {
+  const splash = document.getElementById('splash');
+  const main = document.getElementById('main');
+  const skipBtn = document.getElementById('skipBtn');
+  const wrappers = document.querySelectorAll('.splash-name-wrapper');
+
+  // Pre-build particles + cracks for each name (12 particles, 9 cracks)
+  wrappers.forEach((wrapper) => {
+    // Particles fly upward & outward (debris)
+    for (let p = 0; p < 14; p++) {
+      const particle = document.createElement('span');
+      particle.className = 'particle';
+      const angle = -90 + (Math.random() - 0.5) * 160; // mostly upward
+      const distance = 50 + Math.random() * 80;
+      const dx = Math.cos(angle * Math.PI / 180) * distance;
+      const dy = Math.sin(angle * Math.PI / 180) * distance;
+      particle.style.setProperty('--dx', dx + 'px');
+      particle.style.setProperty('--dy', dy + 'px');
+      particle.style.animationDelay = (Math.random() * 0.05) + 's';
+      // Vary particle color slightly
+      if (Math.random() > 0.7) {
+        particle.style.background = '#ff006e';
+        particle.style.boxShadow = '0 0 8px #ff006e';
+      } else if (Math.random() > 0.5) {
+        particle.style.background = '#fff';
+        particle.style.boxShadow = '0 0 8px #fff';
+      }
+      wrapper.appendChild(particle);
+    }
+
+    // Crack lines radiate downward
+    for (let c = 0; c < 11; c++) {
+      const crack = document.createElement('span');
+      crack.className = 'crack';
+      // Angle between -75° and 75° from straight down
+      const angle = -75 + (c * 150 / 10);
+      crack.style.transform = `translateX(-50%) rotate(${angle}deg)`;
+      crack.style.setProperty('--len', (40 + Math.random() * 50) + 'px');
+      crack.style.animationDelay = (Math.random() * 0.08) + 's';
+      wrapper.appendChild(crack);
+    }
+  });
+
+  // Timing
+  const dropDelays = [0, 380, 760, 1140];
+  const landDelays = [550, 930, 1310, 1690];
+  const totalDuration = 2950; // ms before transitioning to main
+
+  // Trigger animations
+  wrappers.forEach((wrapper, i) => {
+    const nameEl = wrapper.querySelector('.splash-name');
+    setTimeout(() => {
+      nameEl.classList.add('dropping');
+    }, dropDelays[i]);
+
+    setTimeout(() => {
+      wrapper.classList.add('landed');
+      splash.classList.add('shake');
+      setTimeout(() => splash.classList.remove('shake'), 250);
+    }, landDelays[i]);
+  });
+
+  // Show skip button after 0.8s
+  setTimeout(() => skipBtn.classList.add('visible'), 800);
+
+  // Function to transition to main page
+  function showMain() {
+    splash.classList.add('fade-out');
+    main.classList.add('visible');
+    setTimeout(() => {
+      splash.style.display = 'none';
+      // Trigger reveal observer for any sections in viewport
+      revealObserver();
+    }, 600);
+  }
+
+  // Auto-transition
+  const autoTimer = setTimeout(showMain, totalDuration);
+
+  // Skip button
+  skipBtn.addEventListener('click', () => {
+    clearTimeout(autoTimer);
+    showMain();
+  });
+
+  // ===================================================================
+  // SCROLL REVEAL ANIMATIONS
+  // ===================================================================
+  function revealObserver() {
+    const reveals = document.querySelectorAll('.reveal');
+    if ('IntersectionObserver' in window) {
+      const obs = new IntersectionObserver((entries) => {
+        entries.forEach((e) => {
+          if (e.isIntersecting) {
+            e.target.classList.add('in-view');
+            obs.unobserve(e.target);
+          }
+        });
+      }, { threshold: 0.12, rootMargin: '0px 0px -50px 0px' });
+      reveals.forEach((el) => obs.observe(el));
+    } else {
+      // Fallback: just show everything
+      reveals.forEach((el) => el.classList.add('in-view'));
+    }
+  }
+})();
+</script>
+
+</body>
+</html>
