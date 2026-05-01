@@ -4,7 +4,7 @@
 > A complete falsifiable empirical pipeline built end-to-end in Python, validated with statistically rigorous out-of-sample inference.
 
 [![Live Site](https://img.shields.io/badge/🌐_Live_Site-anay--a--joshi.github.io%2FStochastiQ-00d4ff?style=for-the-badge)](https://anay-a-joshi.github.io/StochastiQ/)
-[![Final Report](https://img.shields.io/badge/📄_Final_Report-PDF_(35_pp)-ff006e?style=for-the-badge)](https://github.com/anay-a-joshi/StochastiQ/blob/main/reports/StochastiQ_Final_Report.pdf)
+[![Final Report](https://img.shields.io/badge/📄_Final_Report-PDF_(36_pp)-ff006e?style=for-the-badge)](https://github.com/anay-a-joshi/StochastiQ/blob/main/reports/StochastiQ_Final_Report.pdf)
 
 [![Python 3.12](https://img.shields.io/badge/python-3.12-3776AB.svg?logo=python&logoColor=white)](https://www.python.org/downloads/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
