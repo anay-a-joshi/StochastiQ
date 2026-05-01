@@ -40,9 +40,21 @@
 
 \captionsetup{font=small,labelfont=bf,format=plain}
 
+% \lstset{
+%   basicstyle=\small\ttfamily,
+%   breaklines=true,
+%   frame=single,
+%   framesep=4pt,
+%   rulecolor=\color{black!30},
+%   showstringspaces=false,
+% }
+
 \lstset{
   basicstyle=\small\ttfamily,
   breaklines=true,
+  breakatwhitespace=true,
+  columns=fullflexible,
+  keepspaces=true,
   frame=single,
   framesep=4pt,
   rulecolor=\color{black!30},
@@ -62,6 +74,11 @@
 Options Overlay, and Regime-Conditional Validation\par}
 \vspace{1.5cm}
 
+{\large\bfseries Project Website\par}
+\vspace{0.2cm}
+{\large \url{https://anay-a-joshi.github.io/StochastiQ/}\par}
+\vspace{1cm}
+
 {\large\bfseries Team Members\par}
 \vspace{0.3cm}
 {\large
@@ -78,7 +95,7 @@ Himanshu Bhatt \\[2pt]
 \vspace{0.3cm}
 {\large\bfseries Instructor\par}
 \vspace{0.2cm}
-{\large Prof.\ Satyajit Karnik\par}
+{\large Professor\ Satyajit Karnik\par}
 \vspace{0.5cm}
 {\large Georgia Institute of Technology\par M.S.\ in Quantitative and Computational Finance\par Spring 2026\par}
 
@@ -87,7 +104,7 @@ Himanshu Bhatt \\[2pt]
 \begin{center}
 \fbox{\parbox{0.88\textwidth}{
 \centering\small
-\textbf{Project Direction.} This work was carried out under \emph{Project Idea 6} (independent direction, approved in advance by the instructor). Our project incorporates the full blueprint of \emph{Project Idea 1} —stochastic simulation of a portfolio under GBM, Merton, CEV and Heston with weight reoptimization and an options overlay— and substantially extends it with statistically rigorous out-of-sample validation, Hidden-Markov-Model regime conditioning, and coherent-risk-measure (CVaR) decomposition. \\[5pt]
+\textbf{Project Direction.} This project work was carried out under \emph{Project Idea 6}. Our project incorporates the full blueprint of \emph{Project Idea 1} — stochastic simulation of a portfolio under GBM, Merton, CEV and Heston with weight reoptimization and an options overlay — and substantially extends it with statistically rigorous out-of-sample validation, Hidden-Markov-Model regime conditioning, and coherent-risk-measure (CVaR) decomposition. \\[5pt]
 \textbf{Repository.} All source code, notebooks, processed data, and reproducible artifacts are publicly available at \\
 \url{https://github.com/anay-a-joshi/StochastiQ} \\[2pt]
 under the MIT License.
@@ -125,7 +142,7 @@ The central empirical question we set out to answer is whether a model-robust po
 
 \subsection{Project Direction: Building on Project~1 with the Latitude of Project~6}
 
-This project was carried out under \emph{Project Idea 6} (independent direction, approved in advance by the instructor). It is structured as a substantial extension of \emph{Project Idea 1}, whose blueprint we adopted in full and then expanded along several dimensions that we believe were necessary to draw scientifically meaningful conclusions.
+This project was carried out under \emph{Project Idea 6} (independent direction). It is structured as a substantial extension of \emph{Project Idea 1}, whose blueprint we adopted in full and then expanded along several dimensions that we believe were necessary to draw scientifically meaningful conclusions.
 
 The core of Project Idea 1 was: pick a portfolio of stocks/ETFs, build a minimum-variance/maximum-return baseline, simulate forward under GBM, Merton, CEV and Heston, reoptimize the weights to perform best across the model-conditional distributions, add a suitable options overlay to improve the Sharpe ratio, and finally take a view on which models are most pertinent for the future. Every single one of those components appears in our work:
 
@@ -326,34 +343,66 @@ We calibrate via moment matching on the conditional variance dynamics, with the 
 
 Table~\ref{tab:calibration} reports the calibrated parameters for AAPL and MSFT (representative); full tables for all seven tickers are in the project repository under \texttt{data/processed/calibrated\_parameters.parquet}. The complete calibrated parameter set has 154 rows ($7 \text{ tickers} \times 22 \text{ parameters across 4 models}$).
 
-\begin{table}[h]
+% \begin{table}[h]
+% \centering
+% \caption{Calibrated parameter values for AAPL and MSFT (annualized where applicable). The Merton jump intensity $\lambda$ is reported as expected jumps per year.}
+% \label{tab:calibration}
+% \small
+% \begin{tabular}{llrr}
+% \toprule
+% Model & Parameter & AAPL & MSFT \\
+% \midrule
+% GBM    & $\mu$        & $0.298$ & $0.249$ \\
+%        & $\sigma$     & $0.317$ & $0.305$ \\
+% \midrule
+% Merton & $\mu$        & $0.302$ & $0.253$ \\
+%        & $\sigma$     & $0.271$ & $0.260$ \\
+%        & $\lambda$    & $3.81$  & --- \\
+%        & $\mu_J$      & $0.012$ & --- \\
+%        & $\sigma_J$   & $0.087$ & --- \\
+% \midrule
+% CEV    & $\mu$        & $0.298$ & --- \\
+%        & $\sigma$     & $24.66$ & --- \\
+%        & $\beta$      & $0.100$ & --- \\
+% \midrule
+% Heston & $\mu$        & $0.298$ & --- \\
+%        & $\kappa$     & $2.27$  & --- \\
+%        & $\theta$     & $0.101$ & --- \\
+%        & $\xi$        & $0.900$ & --- \\
+%        & $\rho$       & $-0.031$& --- \\
+%        & $v_0$        & $0.027$ & --- \\
+% \bottomrule
+% \end{tabular}
+% \end{table}
+
+\begin{table}[!htbp]
 \centering
-\caption{Calibrated parameter values for AAPL and MSFT (annualized where applicable). The Merton jump intensity $\lambda$ is reported as expected jumps per year.}
+\caption{Calibrated parameter values for AAPL and MSFT (annualized where applicable). The Merton jump intensity $\lambda$ is reported as expected jumps per year. The full calibrated parameter set for all 7 tickers (154 rows) is persisted in \texttt{data/processed/calibrated\_parameters.parquet}.}
 \label{tab:calibration}
 \small
 \begin{tabular}{llrr}
 \toprule
 Model & Parameter & AAPL & MSFT \\
 \midrule
-GBM    & $\mu$        & $0.298$ & $0.249$ \\
-       & $\sigma$     & $0.317$ & $0.305$ \\
+GBM    & Drift $\mu$                    & $+0.298$ & $+0.249$ \\
+       & Volatility $\sigma$            & $+0.317$ & $+0.305$ \\
 \midrule
-Merton & $\mu$        & $0.302$ & $0.253$ \\
-       & $\sigma$     & $0.271$ & $0.260$ \\
-       & $\lambda$    & $3.81$  & --- \\
-       & $\mu_J$      & $0.012$ & --- \\
-       & $\sigma_J$   & $0.087$ & --- \\
+Merton & Drift $\mu$                    & $+0.302$ & $+0.253$ \\
+       & Diffusion volatility $\sigma$  & $+0.271$ & $+0.260$ \\
+       & Jump intensity $\lambda$       & $+3.81$  & $+3.81$  \\
+       & Mean log-jump $\mu_J$          & $+0.012$ & $+0.015$ \\
+       & Log-jump dispersion $\sigma_J$ & $+0.087$ & $+0.084$ \\
 \midrule
-CEV    & $\mu$        & $0.298$ & --- \\
-       & $\sigma$     & $24.66$ & --- \\
-       & $\beta$      & $0.100$ & --- \\
+CEV    & Drift $\mu$                    & $+0.298$ & $+0.249$ \\
+       & Scale $\sigma$                 & $+24.66$ & $+42.87$ \\
+       & Elasticity $\beta$             & $+0.100$ & $+0.100$ \\
 \midrule
-Heston & $\mu$        & $0.298$ & --- \\
-       & $\kappa$     & $2.27$  & --- \\
-       & $\theta$     & $0.101$ & --- \\
-       & $\xi$        & $0.900$ & --- \\
-       & $\rho$       & $-0.031$& --- \\
-       & $v_0$        & $0.027$ & --- \\
+Heston & Drift $\mu$                    & $+0.298$ & $+0.249$ \\
+       & Mean-reversion $\kappa$        & $+2.27$  & $+2.17$  \\
+       & Long-run variance $\theta$     & $+0.101$ & $+0.094$ \\
+       & Vol-of-vol $\xi$               & $+0.900$ & $+0.986$ \\
+       & Leverage correlation $\rho$    & $-0.031$ & $-0.066$ \\
+       & Initial variance $v_0$         & $+0.027$ & $+0.038$ \\
 \bottomrule
 \end{tabular}
 \end{table}
@@ -718,22 +767,42 @@ Figure~\ref{fig:cvar-by-regime} visualizes the comparison.
 
 Table~\ref{tab:verdict} aggregates the Phase~7 findings under our pre-registered decision rules. The Sharpe-ratio comparisons return Underpowered verdicts; the VIX validation, the CVaR comparison, and the qualitative regime-detection cross-check all return positive verdicts.
 
-\begin{table}[h]
+% \begin{table}[h]
+% \centering
+% \caption{Phase~7 verdict table.}
+% \label{tab:verdict}
+% \small
+% \begin{tabular}{lrlll}
+% \toprule
+% Test & Estimate & 95\% CI & $p$ & Verdict \\
+% \midrule
+% Min-max vs.\ EW (Stress)               & $-0.056$  & $[-0.63, +0.48]$ & 0.84 & Underpowered \\
+% Min-max vs.\ EW (Calm)                 & $+0.073$  & $[-0.39, +0.53]$ & 0.76 & Underpowered \\
+% VIX premium (Stress $-$ Calm)          & $+15.74$  & ---              & ---  & \textbf{Validated (large)} \\
+% HMM vs.\ Realized-Vol $\kappa$         & $+0.235$  & ---              & ---  & Weak agreement \\
+% Min-max stress CVaR vs.\ EW            & $+53$ bps & (point estimate) & ---  & \textbf{Better tail risk} \\
+% \bottomrule
+% \end{tabular}
+% \end{table}
+
+\begin{table}[!htbp]
 \centering
-\caption{Phase~7 verdict table.}
+\caption{Phase~7 verdict table summarizing the headline findings against pre-registered decision rules. All 95\% confidence intervals computed via $B = 5{,}000$ bootstrap replicates.}
 \label{tab:verdict}
 \small
-\begin{tabular}{lrlll}
+\resizebox{\textwidth}{!}{%
+\begin{tabular}{lrrrl}
 \toprule
-Test & Estimate & 95\% CI & $p$ & Verdict \\
+Test & Estimate & 95\% CI & $p$-value & Verdict \\
 \midrule
-Min-max vs.\ EW (Stress)               & $-0.056$  & $[-0.63, +0.48]$ & 0.84 & Underpowered \\
-Min-max vs.\ EW (Calm)                 & $+0.073$  & $[-0.39, +0.53]$ & 0.76 & Underpowered \\
-VIX premium (Stress $-$ Calm)          & $+15.74$  & ---              & ---  & \textbf{Validated (large)} \\
-HMM vs.\ Realized-Vol $\kappa$         & $+0.235$  & ---              & ---  & Weak agreement \\
-Min-max stress CVaR vs.\ EW            & $+53$ bps & (point estimate) & ---  & \textbf{Better tail risk} \\
+Min-max vs.\ EW (Stress)               & $-0.056$    & $[-0.633,\, +0.482]$    & 0.843 & Underpowered \\
+Min-max vs.\ EW (Calm)                 & $+0.073$    & $[-0.392,\, +0.531]$    & 0.761 & Underpowered \\
+VIX premium (Stress $-$ Calm)          & $+15.74$    & $[+13.77,\, +17.86]$    & ---   & \textbf{Validated (large)} \\
+HMM vs.\ Realized-Vol $\kappa$         & $+0.235$    & $[+0.202,\, +0.271]$    & ---   & Weak agreement \\
+Min-max stress CVaR vs.\ EW            & $+51.5$ bps & $[-29.2,\, +127.5]$ bps & ---   & \textbf{Better tail risk (point)} \\
 \bottomrule
-\end{tabular}
+\end{tabular}%
+}
 \end{table}
 
 \subsection{The Sharpe-vs-CVaR Divergence Visualized}
@@ -799,7 +868,7 @@ We disclose the following limitations explicitly.
 % =================================================================
 \section{Conclusion}
 
-This project implements and validates a multi-model robust portfolio optimization framework for a seven-asset universe, integrating the full set of components prescribed by Project Idea~1 (Markowitz baseline, four stochastic-process models, multi-model portfolio reoptimization, BSM options overlay) and substantially extending the validation framework along the lines that we believed —and the instructor approved— were necessary to qualify the work as Project Idea~6.
+This project implements and validates a multi-model robust portfolio optimization framework for a seven-asset universe, integrating the full set of components prescribed by Project Idea~1 (Markowitz baseline, four stochastic-process models, multi-model portfolio reoptimization, BSM options overlay) and substantially extending the validation framework along the lines that we believed, and the instructor approved, were necessary to qualify the work as Project Idea~6.
 
 The empirical conclusion is two-part. \emph{Unconditionally}, the model-robust Min-max portfolio is statistically indistinguishable from the naïve $1/N$ benchmark on out-of-sample Sharpe ratio over a single 16-month window —a textbook \citet{demiguel2009optimal} result, which we report honestly. \emph{Conditional on regime}, the Sharpe-ratio finding survives, but the regime-conditional CVaR comparison reveals that the model-robust portfolios deliver measurable tail-risk reduction during Stress regimes (53–62 basis points per day for Min-max, Per-Heston, and Per-Merton) at a measurable cost in Calm-regime tail risk —the expected design signature of a tail-risk-insurance strategy.
 
@@ -826,43 +895,62 @@ The complete project is publicly available at \url{https://github.com/anay-a-jos
 
 \begin{lstlisting}[basicstyle=\small\ttfamily,frame=none]
 StochastiQ/
-|-- src/                              # production source code
-|   |-- config.py                     # global constants (rf, trading days, seed)
-|   |-- data/loaders.py               # yfinance ingestion, return computation
-|   |-- models/                       # stochastic process implementations
+|-- data/
+|   |-- processed/                    # Parquet result files (gitignored)
+|   |-- raw/                          # Raw price downloads (gitignored)
+|   `-- README.md
+|-- docs/                             # GitHub Pages site
+|   |-- index.html
+|   |-- methodology.md
+|   `-- references.md
+|-- notebooks/                        # 8 Jupyter notebooks (one per phase)
+|   |-- 01_data_pull.ipynb
+|   |-- 02_markowitz_optimization.ipynb
+|   |-- 03_model_calibration.ipynb
+|   |-- 04_monte_carlo_robust_portfolio.ipynb
+|   |-- 05_options_overlay.ipynb
+|   |-- 06_out_of_sample_validation.ipynb
+|   |-- 07_regime_analysis.ipynb
+|   `-- 08_final_results.ipynb
+|-- reports/
+|   |-- figures/                      # 35 generated PNGs across all phases
+|   |-- tables/
+|   |-- build_report.sh               # One-command compile script
+|   |-- references.bib                # Bibliography
+|   |-- StochastiQ_Final_Report.tex   # This document
+|   `-- StochastiQ_Final_Report.pdf   # Compiled output
+|-- src/                              # Production source code
+|   |-- config.py                     # Global constants (rf, trading days, seed=42)
+|   |-- analysis/
+|   |-- calibration/
+|   |   `-- calibrators.py            # MLE / MoM fitting routines
+|   |-- data/
+|   |   `-- loaders.py                # yfinance ingestion, return computation
+|   |-- models/                       # Stochastic process implementations
 |   |   |-- gbm.py
 |   |   |-- merton.py
 |   |   |-- cev.py
 |   |   `-- heston.py
-|   |-- simulation/monte_carlo.py     # Cholesky-correlated path generation
 |   |-- optimization/
 |   |   |-- markowitz.py              # Phase 2 mean-variance frontier
 |   |   `-- robust.py                 # Phase 4 per-model + min-max + blends
 |   |-- options/                      # Phase 5 BSM overlay
-|   |   |-- bsm.py                    # Black-Scholes-Merton pricing
-|   |   `-- strategies.py             # covered call, protective put, collar
-|   |-- validation/bootstrap.py       # Politis-Romano stationary bootstrap
-|   `-- regime/                       # Phase 7 HMM module
-|       |-- detection.py              # 2-state Gaussian HMM with relabeling
-|       `-- evaluation.py             # regime-conditional metrics
-|-- notebooks/
-|   |-- 01_data_pull.ipynb            # data ingestion, sanity checks
-|   |-- 02_markowitz.ipynb            # mean-variance baseline
-|   |-- 03_model_calibration.ipynb    # GBM/Merton/CEV/Heston fits
-|   |-- 04_monte_carlo_robust_portfolios.ipynb
-|   |-- 05_options_overlay.ipynb      # BSM strategies
-|   |-- 06_out_of_sample_validation.ipynb  # bootstrap inference
-|   |-- 07_regime_analysis.ipynb      # HMM + regime-conditional analysis
-|   `-- 08_final_results.ipynb        # cross-phase aggregation
-|-- data/processed/                   # parquet files (gitignored)
-|-- reports/
-|   |-- figures/                      # all generated PNGs (~30 figures)
-|   |-- StochastiQ_Final_Report.tex   # this document
-|   |-- references.bib                # bibliography
-|   `-- build_report.sh               # one-command compile script
-|-- requirements.txt                  # Python dependencies
+|   |   |-- black_scholes.py          # Black-Scholes-Merton pricing + Greeks
+|   |   `-- strategies.py             # Covered call, protective put, collar
+|   |-- regime/                       # Phase 7 HMM module
+|   |   |-- detection.py              # 2-state Gaussian HMM with relabeling
+|   |   `-- evaluation.py             # Regime-conditional metrics
+|   |-- simulation/
+|   |   `-- monte_carlo.py            # Cholesky-correlated path generation
+|   |-- utils/
+|   `-- validation/
+|       |-- bootstrap.py              # Politis-Romano stationary bootstrap
+|       `-- oos.py                    # Out-of-sample evaluation utilities
+|-- tests/                            # Unit tests
+|   `-- test_models.py
 |-- LICENSE                           # MIT
-`-- README.md
+|-- README.md
+`-- requirements.txt                  # Python dependencies
 \end{lstlisting}
 
 The Git history is preserved with phase-by-phase commits, each pushing a self-contained, runnable contribution. The most recent commits, in chronological order, are: \texttt{5dbac85} (Phase~4), \texttt{c3127a8} (Phase~5), \texttt{a42d140} (Phase~6), \texttt{664d3df} (Phase~3 source patch), \texttt{21b7e4f} (Phase~7), and the Phase~8 commit (this report).
@@ -894,6 +982,6 @@ All four team members contributed substantively to the project. Specifically:
 \item \textbf{Himanshu Bhatt} led the BSM options overlay (Phase~5) including all three strategies, the Greek profiles, and the Sharpe-grid evaluation, and contributed to the discussion of options-overlay implications in Section~9.
 \end{itemize}
 
-All authors reviewed and approved the final report.
+All authors/team-members reviewed and approved the final report.
 
 \end{document}
